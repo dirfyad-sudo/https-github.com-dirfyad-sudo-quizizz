@@ -1,0 +1,121 @@
+@import "tailwindcss";
+
+@keyframes float-slow {
+  0%, 100% {
+    transform: translateY(0px) translateX(0px) scale(1);
+    opacity: 0.15;
+  }
+  50% {
+    transform: translateY(-60px) translateX(30px) scale(1.2);
+    opacity: 0.5;
+  }
+}
+
+@keyframes float-medium {
+  0%, 100% {
+    transform: translateY(0px) translateX(0px) scale(0.9);
+    opacity: 0.12;
+  }
+  50% {
+    transform: translateY(-40px) translateX(-25px) scale(1.1);
+    opacity: 0.45;
+  }
+}
+
+@keyframes float-fast {
+  0%, 100% {
+    transform: translateY(0px) translateX(0px) scale(0.8);
+    opacity: 0.1;
+  }
+  50% {
+    transform: translateY(-90px) translateX(20px) scale(1.3);
+    opacity: 0.6;
+  }
+}
+
+/* Card Floating Bubble animations */
+@keyframes bubble-card-1 {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-8px) rotate(0.4deg);
+  }
+}
+
+@keyframes bubble-card-2 {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-6px) rotate(-0.3deg);
+  }
+}
+
+@keyframes bubble-card-3 {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-11px) rotate(0.6deg);
+  }
+}
+
+/* Glass bubble particles rising animation */
+@keyframes bubble-rise {
+  0% {
+    transform: translateY(110%) scale(0.5) translateX(0px);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.6;
+  }
+  50% {
+    transform: translateY(50%) scale(1.1) translateX(15px);
+  }
+  85% {
+    opacity: 0.4;
+  }
+  100% {
+    transform: translateY(-10%) scale(0.6) translateX(-10px);
+    opacity: 0;
+  }
+}
+
+.animate-float-slow {
+  animation: float-slow 22s ease-in-out infinite;
+}
+
+.animate-float-medium {
+  animation: float-medium 14s ease-in-out infinite;
+}
+
+.animate-float-fast {
+  animation: float-fast 9s ease-in-out infinite;
+}
+
+/* Bubble Float Utility Classes */
+.animate-bubble-card-1 {
+  animation: bubble-card-1 7s ease-in-out infinite;
+}
+
+.animate-bubble-card-2 {
+  animation: bubble-card-2 8.5s ease-in-out infinite;
+}
+
+.animate-bubble-card-3 {
+  animation: bubble-card-3 6s ease-in-out infinite;
+}
+
+.animate-bubble-rise-slow {
+  animation: bubble-rise 12s linear infinite;
+}
+
+.animate-bubble-rise-medium {
+  animation: bubble-rise 8s linear infinite;
+}
+
+.animate-bubble-rise-fast {
+  animation: bubble-rise 5.5s linear infinite;
+}
+

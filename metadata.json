@@ -1,0 +1,6 @@
+{
+  "name": "Quiziz",
+  "description": "Interactive learning platform with smart AI quiz generator, mindmaps, flashcards, simulated battle mode, and a visual learning assistant.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
