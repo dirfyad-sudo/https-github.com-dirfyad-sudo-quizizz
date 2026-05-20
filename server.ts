@@ -8,7 +8,7 @@ import { createServer as createViteServer } from "vite";
 dotenv.config();
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.DISABLE_HMR === "true" ? 3000 : (Number(process.env.PORT) || 3000);
 
 // Set up JSON parsing with a limit for rich visual images/screenshot uploads
 app.use(express.json({ limit: "50mb" }));
@@ -320,6 +320,58 @@ ${materialText || "Gunakan materi edukatif umum berkualitas tinggi."}
   } catch (error: any) {
     console.error("Error generating summary:", error);
     res.status(500).json({ error: error.message || "Gagal menggenerate rangkuman pintar" });
+  }
+});
+
+
+// 4. REAL-TIME MULTI-MODAL DOCUMENT & IMAGE SCANNING (OCR) ENDPOINT
+app.post("/api/scan-document", async (req, res) => {
+  const { image, mimeType } = req.body;
+  try {
+    if (!image) {
+      return res.status(400).json({ error: "Silakan unggah dokumen gambar atau screenshot terlebih dahulu." });
+    }
+
+    let detectedMimeType = mimeType || "image/png";
+    let base64Data = image;
+
+    // Detect mime type and extract raw base64 data if prefixed
+    const match = image.match(/^data:([^;]+);base64,(.*)$/);
+    if (match) {
+      detectedMimeType = match[1];
+      base64Data = match[2];
+    }
+
+    const parts: any[] = [
+      {
+        text: `Lakukan pemindaian OCR premium dan analisis kognitif visual mendalam pada berkas dokumen pembelajaran, grafik, tabel, atau catatan ini.
+
+Langkah Analisis:
+1. Ekstrak seluruh teks literatur secara utuh dengan akurasi 100%.
+2. Jika terdapat tabel/grafik/diagram, rekonstruksikan data tersebut menggunakan tabel Markdown yang bersih dan mudah dibaca, serta jelaskan makna tren/alurnya.
+3. Berikan tajuk/sub-bab yang sesuai agar tulisan menjadi teratur.
+4. Segera kembalikan hasil OCR yang rapi, bersih, dan informatif tanpa ada metadata sistem yang membosankan.`
+      },
+      {
+        inlineData: {
+          mimeType: detectedMimeType,
+          data: base64Data,
+        }
+      }
+    ];
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.5-flash",
+      contents: { parts },
+      config: {
+        temperature: 0.2, // Low temperature increases precision for transcriptions/OCR data representation
+      }
+    });
+
+    res.json({ success: true, text: response.text });
+  } catch (error: any) {
+    console.error("Error dalam scanning dokumen:", error);
+    res.status(500).json({ error: error.message || "Gagal memindai dokumen dengan AI" });
   }
 });
 

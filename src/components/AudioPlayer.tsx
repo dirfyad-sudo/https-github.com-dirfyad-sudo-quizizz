@@ -46,7 +46,7 @@ export default function AudioPlayer({ id = "audio-player-dock" }: AudioPlayerPro
   }, [selectedSpotifyId]);
 
   return (
-    <div id={id} className="fixed bottom-6 left-6 z-40">
+    <div id={id} className="fixed bottom-24 left-4 md:bottom-6 md:left-6 z-40">
       <AnimatePresence>
         {!isExpanded ? (
           <motion.button

@@ -39,7 +39,13 @@ import {
   Flame,
   VolumeX,
   Compass,
-  Trophy
+  Trophy,
+  Cloud,
+  Server,
+  Globe,
+  ExternalLink,
+  Copy,
+  Check
 } from "lucide-react";
 
 import { audio } from "./utils/audioEngine";
@@ -175,6 +181,9 @@ export default function App() {
   // Input & Generation State
   const [materialText, setMaterialText] = useState("");
   const [materialImage, setMaterialImage] = useState<string | null>(null);
+  const [summaryMaterialText, setSummaryMaterialText] = useState("");
+  const [summaryMaterialImage, setSummaryMaterialImage] = useState<string | null>(null);
+  const [isScanningImageForSummary, setIsScanningImageForSummary] = useState(false);
   const [count, setCount] = useState<number>(5);
   const [difficulty, setDifficulty] = useState<Difficulty>("Medium");
   const [quizType, setQuizType] = useState<QuestionType>("Mixed");
@@ -476,28 +485,96 @@ export default function App() {
       audio.playClick();
       const reader = new FileReader();
       reader.onloadend = () => {
-        setMaterialImage(reader.result as string);
-        simulateOcrScanning();
+        const base64Data = reader.result as string;
+        setMaterialImage(base64Data);
+        handleRealOcrScanning(base64Data);
       };
       reader.readAsDataURL(file);
     }
   };
 
-  const simulateOcrScanning = () => {
+  const handleSummaryImageUploaded = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      audio.playClick();
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64Data = reader.result as string;
+        setSummaryMaterialImage(base64Data);
+        handleRealOcrScanningForSummary(base64Data);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRealOcrScanningForSummary = async (base64Image: string) => {
+    setIsScanningImageForSummary(true);
+    showToast("Mengisi data... Memulai pemindaian berkas visual & dokumen oleh Gemini AI!");
+    try {
+      const response = await fetch("/api/scan-document", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ image: base64Image }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Gagal menyambungkan ke asisten scanner AI.");
+      }
+
+      const data = await response.json();
+      if (data.success && data.text) {
+        setSummaryMaterialText((prev) => {
+          const header = prev ? "\n\n--- [HASIL PINDAI AI] ---\n" : "";
+          return prev ? prev + header + data.text : data.text;
+        });
+        showToast("Ekstraksi & Pemindaian Dokumen Berhasil!");
+      } else {
+        throw new Error(data.error || "Gagal memindai dokumen.");
+      }
+    } catch (err: any) {
+      console.error("Error scanning document:", err);
+      showToast(`Error Scan: ${err.message || 'gagal memproses'}`);
+    } finally {
+      setIsScanningImageForSummary(false);
+    }
+  };
+
+  const handleRealOcrScanning = async (base64Image: string) => {
     setIsScanningImage(true);
     setImageOcrResult(null);
-    let pct = 0;
-    const interval = setInterval(() => {
-      pct += 25;
-      if (pct >= 100) {
-        clearInterval(interval);
-        setIsScanningImage(false);
-        const parsedOcr = "Materi visual terekstraksi: Deskripsi bagan organ pernapasan bawah, letak bronkiolus, fasa hisap udara bersih, fasa melepas karbon dioksida basah, fusi hemoglobin.";
-        setImageOcrResult(parsedOcr);
-        setMaterialText((prev) => prev ? prev + "\n" + parsedOcr : parsedOcr);
-        showToast("Ekstraksi OCR Gambar selesai dilakukan!");
+    showToast("Mengisi data... Memulai pemindaian berkas visual & dokumen oleh Gemini AI!");
+    try {
+      const response = await fetch("/api/scan-document", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ image: base64Image }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Gagal menyambungkan ke asisten scanner AI.");
       }
-    }, 1200);
+
+      const data = await response.json();
+      if (data.success && data.text) {
+        setImageOcrResult(data.text);
+        setMaterialText((prev) => {
+          const header = prev ? "\n\n--- [HASIL PINDAI AI] ---\n" : "";
+          return prev ? prev + header + data.text : data.text;
+        });
+        showToast("Ekstraksi & Pemindaian Dokumen Berhasil!");
+      } else {
+        throw new Error(data.error || "Gagal memindai dokumen.");
+      }
+    } catch (err: any) {
+      console.error("Error scanning document:", err);
+      showToast(`Error Scan: ${err.message || 'gagal memproses'}`);
+    } finally {
+      setIsScanningImage(false);
+    }
   };
 
   // Advanced secure API Generator call for quiz questions
@@ -1274,10 +1351,45 @@ export default function App() {
         </div>
       ) : (
         /* ACTIVE APP LAYOUT DESIGN */
-        <div className="relative z-10 flex min-h-screen">
+        <div className="relative z-10 flex flex-col md:flex-row min-h-screen">
           
-          {/* Sidebar drawer navigation panel */}
-          <aside className="w-16 md:w-64 border-r border-white/5 bg-slate-950/90 backdrop-blur-md flex flex-col justify-between py-6 shrink-0 relative z-20">
+          {/* Mobile Sticky Top Header */}
+          <header className="md:hidden sticky top-0 z-30 w-full bg-slate-950/80 border-b border-white/5 backdrop-blur-md px-4 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-violet-600 flex items-center justify-center text-white shadow-md shadow-violet-600/30">
+                <Brain className="w-4 h-4" />
+              </div>
+              <h3 className="text-sm font-black tracking-tight text-white uppercase font-sans">
+                QUIZIZ
+              </h3>
+            </div>
+            
+            <div className="flex items-center gap-3">
+              {/* User overview small card */}
+              <div className="flex items-center gap-1.5 bg-white/5 border border-white/5 px-2 py-1 rounded-xl text-xs">
+                <div className="w-5 h-5 rounded-full bg-violet-500/20 text-violet-400 flex items-center justify-center font-bold text-[10px]">
+                  {userName.slice(0, 2).toUpperCase()}
+                </div>
+                <span className="text-[10px] text-slate-300 truncate max-w-[70px] font-semibold">{userName}</span>
+              </div>
+              
+              {/* Sign out */}
+              <button
+                onClick={() => {
+                  audio.playClick();
+                  localStorage.removeItem("quiziz_uname");
+                  setUserName("");
+                  setIsStarted(false);
+                }}
+                className="text-[10px] text-gray-500 hover:text-red-400 font-semibold cursor-pointer"
+              >
+                Log Out
+              </button>
+            </div>
+          </header>
+
+          {/* Sidebar drawer navigation panel - Desktop only */}
+          <aside className="hidden md:flex md:w-64 border-r border-white/5 bg-slate-950/90 backdrop-blur-md flex-col justify-between py-6 shrink-0 relative z-20">
             <div className="space-y-8">
               {/* Mini App Branding */}
               <div className="px-4 text-left flex items-center gap-3">
@@ -1380,6 +1492,14 @@ export default function App() {
                   <History className="w-5 h-5 shrink-0" />
                   <span className="hidden md:block">Histori Rangkuman</span>
                 </button>
+
+                <button
+                  onClick={() => { audio.playClick(); setActiveTab("deploy"); }}
+                  className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all cursor-pointer text-sm font-semibold text-left ${activeTab === "deploy" ? "bg-violet-600 text-white shadow-md shadow-violet-600/20" : "text-gray-400 hover:bg-white/5 hover:text-white"}`}
+                >
+                  <Cloud className="w-5 h-5 shrink-0" />
+                  <span className="hidden md:block">Pusat Deploy Cloud</span>
+                </button>
               </nav>
             </div>
 
@@ -1400,12 +1520,94 @@ export default function App() {
           </aside>
 
 
-          {/* MAIN PAGE VIEW AREA */}
-          <main className="flex-1 min-w-0 p-6 md:p-10 z-10 relative">
+          {/* Mobile Floating Bottom Bar Navigation - Sleek, premium, glass-morphic floating UI */}
+          <div className="md:hidden fixed bottom-4 left-4 right-4 z-50 bg-slate-950/90 border border-white/10 p-2 rounded-2xl shadow-xl flex items-center justify-around backdrop-blur-lg overflow-x-auto gap-1 scrollbar-none">
+            <button
+              onClick={() => { audio.playClick(); setActiveTab("dashboard"); }}
+              className={`flex-1 flex flex-col items-center gap-1.5 py-2 px-1.5 rounded-xl transition-all cursor-pointer min-w-[55px] shrink-0 ${activeTab === "dashboard" ? "bg-violet-600 text-white font-bold" : "text-gray-400 hover:text-white"}`}
+            >
+              <Compass className="w-5 h-5 shrink-0" />
+              <span className="text-[9px] font-semibold leading-none">Materi</span>
+            </button>
+            
+            <button
+              onClick={() => { audio.playClick(); setActiveTab("summary"); }}
+              className={`flex-1 flex flex-col items-center gap-1.5 py-2 px-1.5 rounded-xl transition-all cursor-pointer min-w-[55px] shrink-0 ${activeTab === "summary" ? "bg-violet-600 text-white font-bold" : "text-gray-400 hover:text-white"}`}
+            >
+              <BookOpen className="w-5 h-5 shrink-0" />
+              <span className="text-[9px] font-semibold leading-none">Rangkum</span>
+            </button>
+            
+            <button
+              onClick={() => {
+                audio.playClick();
+                if (quizQuestions.length > 0 && activeSession) {
+                  setActiveTab("quiz");
+                } else {
+                  showToast("Mulai kuis di menu Materi!");
+                }
+              }}
+              className={`flex-1 flex flex-col items-center gap-1.5 py-2 px-1.5 rounded-xl transition-all cursor-pointer min-w-[55px] shrink-0 ${activeTab === "quiz" ? "bg-violet-600 text-white font-bold" : "text-gray-400 hover:text-white"}`}
+            >
+              <Zap className="w-5 h-5 shrink-0" />
+              <span className="text-[9px] font-semibold leading-none">Kuis</span>
+            </button>
+            
+            <button
+              onClick={() => { audio.playClick(); setActiveTab("battle"); }}
+              className={`flex-1 flex flex-col items-center gap-1.5 py-2 px-1.5 rounded-xl transition-all cursor-pointer min-w-[55px] shrink-0 ${activeTab === "battle" ? "bg-violet-600 text-white font-bold" : "text-gray-400 hover:text-white"}`}
+            >
+              <Swords className="w-5 h-5 shrink-0" />
+              <span className="text-[9px] font-semibold leading-none">Arena</span>
+            </button>
+            
+            <button
+              onClick={() => { audio.playClick(); setActiveTab("leaderboard"); }}
+              className={`flex-1 flex flex-col items-center gap-1.5 py-2 px-1.5 rounded-xl transition-all cursor-pointer min-w-[55px] shrink-0 ${activeTab === "leaderboard" ? "bg-violet-600 text-white font-bold" : "text-gray-400 hover:text-white"}`}
+            >
+              <Trophy className="w-5 h-5 shrink-0" />
+              <span className="text-[9px] font-semibold leading-none">Peringkat</span>
+            </button>
+            
+            <button
+              onClick={() => { audio.playClick(); setActiveTab("stats"); }}
+              className={`flex-1 flex flex-col items-center gap-1.5 py-2 px-1.5 rounded-xl transition-all cursor-pointer min-w-[55px] shrink-0 ${activeTab === "stats" ? "bg-violet-600 text-white font-bold" : "text-gray-400 hover:text-white"}`}
+            >
+              <TrendingUp className="w-5 h-5 shrink-0" />
+              <span className="text-[9px] font-semibold leading-none">Statistik</span>
+            </button>
+            
+            <button
+              onClick={() => { audio.playClick(); setActiveTab("history"); }}
+              className={`flex-1 flex flex-col items-center gap-1.5 py-2 px-1.5 rounded-xl transition-all cursor-pointer min-w-[55px] shrink-0 ${activeTab === "history" ? "bg-violet-600 text-white font-bold" : "text-gray-400 hover:text-white"}`}
+            >
+              <History className="w-5 h-5 shrink-0" />
+              <span className="text-[9px] font-semibold leading-none">Histori</span>
+            </button>
 
-            {/* TAB 1: GENERATOR & INPUT CONTROLLER */}
-            {activeTab === "dashboard" && (
-              <div className="max-w-4xl mx-auto space-y-8 text-left">
+            <button
+              onClick={() => { audio.playClick(); setActiveTab("deploy"); }}
+              className={`flex-1 flex flex-col items-center gap-1.5 py-2 px-1.5 rounded-xl transition-all cursor-pointer min-w-[55px] shrink-0 ${activeTab === "deploy" ? "bg-violet-600 text-white font-bold" : "text-gray-400 hover:text-white"}`}
+            >
+              <Cloud className="w-5 h-5 shrink-0" />
+              <span className="text-[9px] font-semibold leading-none">Cloud</span>
+            </button>
+          </div>
+
+
+          {/* MAIN PAGE VIEW AREA */}
+          <main className="flex-1 min-w-0 p-4 sm:p-6 md:p-10 pb-28 md:pb-10 z-10 relative">
+            <AnimatePresence mode="wait">
+              {/* TAB 1: GENERATOR & INPUT CONTROLLER */}
+              {activeTab === "dashboard" && (
+                <motion.div
+                  key="dashboard"
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -15 }}
+                  transition={{ duration: 0.25, ease: "easeInOut" }}
+                  className="max-w-4xl mx-auto space-y-8 text-left"
+                >
                 
                 {/* Dashboard Heading Banner */}
                 <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -1769,13 +1971,20 @@ export default function App() {
                   )}
                 </AnimatePresence>
 
-              </div>
-            )}
+                </motion.div>
+              )}
 
 
-            {/* TAB 2: SMART SUMMARY INTERACTIVE CARDS & MINDMAP & FLASHCARD CAROUSEL */}
-            {activeTab === "summary" && (
-              <div className="max-w-5xl mx-auto space-y-8 text-left">
+              {/* TAB 2: SMART SUMMARY INTERACTIVE CARDS & MINDMAP & FLASHCARD CAROUSEL */}
+              {activeTab === "summary" && (
+                <motion.div
+                  key="summary"
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -15 }}
+                  transition={{ duration: 0.25, ease: "easeInOut" }}
+                  className="max-w-5xl mx-auto space-y-8 text-left"
+                >
                 
                 {/* Header overview */}
                 <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -2016,13 +2225,20 @@ export default function App() {
                   </div>
                 )}
 
-              </div>
-            )}
+                </motion.div>
+              )}
 
 
-            {/* TAB 3: IMMERSIVE ACTIVE QUIZ VIEW PAGE */}
-            {activeTab === "quiz" && (
-              <div className="max-w-3xl mx-auto text-left relative z-10 space-y-6">
+              {/* TAB 3: IMMERSIVE ACTIVE QUIZ VIEW PAGE */}
+              {activeTab === "quiz" && (
+                <motion.div
+                  key="quiz"
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -15 }}
+                  transition={{ duration: 0.25, ease: "easeInOut" }}
+                  className="max-w-3xl mx-auto text-left relative z-10 space-y-6"
+                >
                 
                 {activeSession && currentQuestion ? (
                   <div className="space-y-6">
@@ -2320,13 +2536,20 @@ export default function App() {
                   </div>
                 )}
 
-              </div>
-            )}
+                </motion.div>
+              )}
 
 
-            {/* TAB 4: BATTLE ARENA (MULTIPLAYER SIMULATION MODE) */}
-            {activeTab === "battle" && (
-              <div className="max-w-4xl mx-auto space-y-8 text-left">
+              {/* TAB 4: BATTLE ARENA (MULTIPLAYER SIMULATION MODE) */}
+              {activeTab === "battle" && (
+                <motion.div
+                  key="battle"
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -15 }}
+                  transition={{ duration: 0.25, ease: "easeInOut" }}
+                  className="max-w-4xl mx-auto space-y-8 text-left"
+                >
                 
                 {/* Header segment information */}
                 <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -2529,13 +2752,20 @@ export default function App() {
                   </div>
                 )}
 
-              </div>
-            )}
+                </motion.div>
+              )}
 
 
-            {/* TAB 5: STUDY STATISTICS DASHBOARD HUB */}
-            {activeTab === "stats" && (
-              <div className="max-w-4xl mx-auto space-y-8 text-left">
+              {/* TAB 5: STUDY STATISTICS DASHBOARD HUB */}
+              {activeTab === "stats" && (
+                <motion.div
+                  key="stats"
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -15 }}
+                  transition={{ duration: 0.25, ease: "easeInOut" }}
+                  className="max-w-4xl mx-auto space-y-8 text-left"
+                >
                 
                 <div>
                   <span className="text-xs font-mono font-bold text-violet-400 uppercase tracking-widest block">PERFORMANCE METRICS</span>
@@ -2643,13 +2873,20 @@ export default function App() {
                   </div>
                 </div>
 
-              </div>
-            )}
+                </motion.div>
+              )}
 
 
-            {/* TAB 6: HISTORY REPOSITORY MANAGEMENT */}
-            {activeTab === "history" && (
-              <div className="max-w-4xl mx-auto space-y-8 text-left">
+              {/* TAB 6: HISTORY REPOSITORY MANAGEMENT */}
+              {activeTab === "history" && (
+                <motion.div
+                  key="history"
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -15 }}
+                  transition={{ duration: 0.25, ease: "easeInOut" }}
+                  className="max-w-4xl mx-auto space-y-8 text-left"
+                >
                 
                 <div>
                   <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-widest block">LEARNING ARCHIVES</span>
@@ -2721,18 +2958,236 @@ export default function App() {
                     ))}
                 </div>
 
-              </div>
-            )}
+                </motion.div>
+              )}
 
-            {/* TAB 7: LEADERBOARD SYSTEM MODULE */}
-            {activeTab === "leaderboard" && (
-              <LeaderboardView
-                userName={userName}
-                userStats={userStats}
-                showToast={showToast}
-                realLeaderboard={realLeaderboard}
-              />
+              {/* TAB 7: LEADERBOARD SYSTEM MODULE */}
+              {activeTab === "leaderboard" && (
+                <motion.div
+                  key="leaderboard"
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -15 }}
+                  transition={{ duration: 0.25, ease: "easeInOut" }}
+                >
+                  <LeaderboardView
+                    userName={userName}
+                    userStats={userStats}
+                    showToast={showToast}
+                    realLeaderboard={realLeaderboard}
+                  />
+                </motion.div>
+              )}
+
+              {/* TAB 8: CLOUD DEPLOYMENT HUB MODULE */}
+              {activeTab === "deploy" && (
+                <motion.div
+                  key="deploy"
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -15 }}
+                  transition={{ duration: 0.25, ease: "easeInOut" }}
+                  className="space-y-6"
+                >
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900/60 p-6 rounded-3xl border border-white/5 shadow-xl">
+                  <div>
+                    <span className="text-[10px] font-mono tracking-widest text-violet-400 uppercase font-black">Integrasi Backend & Hosting</span>
+                    <h2 className="text-2xl md:text-3xl font-black text-white tracking-tight mt-1 flex items-center gap-2">
+                      <Cloud className="w-8 h-8 text-violet-400" />
+                      Pusat Deploy Cloud
+                    </h2>
+                    <p className="text-xs text-gray-400 mt-1 max-w-xl">
+                      Quiziz dirancang menggunakan arsitektur full-stack Node.js Express + React Vite. Anda bisa dengan mudah mendiseminasi aplikasi ini ke Cloudflare &amp; Railway secara gratis!
+                    </p>
+                  </div>
+                  <div className="flex gap-2.5">
+                    <a
+                      href="https://railway.app/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 font-bold text-xs text-white transition-all flex items-center gap-1.5 shadow-lg shadow-violet-600/20"
+                    >
+                      Buka Railway
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                    <a
+                      href="https://dash.cloudflare.com/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 font-bold text-xs text-white transition-all flex items-center gap-1.5 shadow-lg shadow-amber-600/20"
+                    >
+                      Buka Cloudflare
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  </div>
+                </div>
+
+                {/* Cloud Grid info */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  
+                  {/* Railway card card */}
+                  <div className="bg-slate-900/50 rounded-3xl border border-white/5 p-6 flex flex-col justify-between hover:border-violet-500/20 transition-all shadow-xl relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 w-44 h-44 bg-violet-600/5 rounded-full blur-3xl pointer-events-none" />
+                    <div>
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-violet-500/10 flex items-center justify-center text-xl">
+                            🚀
+                          </div>
+                          <div>
+                            <h3 className="font-bold text-white text-base">Deploy ke Railway.app</h3>
+                            <p className="text-[10px] text-violet-400 font-mono">Full-Stack Hosting Tercepat</p>
+                          </div>
+                        </div>
+                        <span className="px-2.5 py-1 rounded-full bg-violet-500/10 text-[10px] font-bold text-violet-400">Paling Direkomendasikan</span>
+                      </div>
+
+                      <p className="text-xs text-slate-300 leading-relaxed mb-4">
+                        Railway mendeteksi berkas konfigurasi <code className="text-violet-400 bg-violet-400/5 px-1.5 py-0.5 rounded font-mono">railway.json</code> yang sudah kami sediakan di dalam repositori ini. Server Express Anda akan berjalan secara otomatis dalam hitungan menit.
+                      </p>
+
+                      <div className="space-y-3 mb-6">
+                        <span className="text-[10px] font-bold text-gray-400 block uppercase tracking-wider">Variabel Lingkungan (Env) yang Diperlukan:</span>
+                        <div className="bg-slate-950/80 p-3.5 rounded-2xl border border-white/5 space-y-2 text-xs">
+                          <div className="flex justify-between items-center text-gray-300">
+                            <span className="font-mono">GEMINI_API_KEY</span>
+                            <span className="text-[10px] text-gray-500 font-medium">Dari Google AI Studio</span>
+                          </div>
+                          <div className="flex justify-between items-center text-gray-300">
+                            <span className="font-mono">NODE_ENV</span>
+                            <span className="text-[10px] text-gray-500 font-mono">production</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="bg-slate-950/50 p-4 rounded-2xl border border-white/5">
+                        <span className="text-[10px] font-bold text-purple-400 block mb-2 font-mono uppercase">Langkah Cepat CLI Deployment:</span>
+                        <div className="font-mono text-[11px] text-slate-300 space-y-1 bg-black/40 p-3 rounded-xl border border-white/5 relative group/code overflow-x-auto select-all">
+                          <div>npm i -g @railway/cli</div>
+                          <div>railway login</div>
+                          <div>railway init</div>
+                          <div>railway up</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-6 pt-5 border-t border-white/5 flex items-center justify-between">
+                      <span className="text-[10px] text-gray-400">File Konfigurasi Terdeteksi: <b className="text-emerald-400 font-mono">✓ railway.json</b></span>
+                      <a
+                        href="https://railway.app/new"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white text-xs font-semibold flex items-center gap-1 cursor-pointer"
+                      >
+                        Mulai Template Baru
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </div>
+                  </div>
+
+                  {/* Cloudflare card card */}
+                  <div className="bg-slate-900/50 rounded-3xl border border-white/5 p-6 flex flex-col justify-between hover:border-amber-500/20 transition-all shadow-xl relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 w-44 h-44 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
+                    <div>
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center text-xl">
+                            ☁️
+                          </div>
+                          <div>
+                            <h3 className="font-bold text-white text-base">Custom Domain via Cloudflare</h3>
+                            <p className="text-[10px] text-amber-400 font-mono">Global CDN, DNS &amp; DDoS Shield</p>
+                          </div>
+                        </div>
+                        <span className="px-2.5 py-1 rounded-full bg-amber-500/10 text-[10px] font-bold text-amber-400">Keamanan Premium</span>
+                      </div>
+
+                      <p className="text-xs text-slate-300 leading-relaxed mb-4">
+                        Anda dapat menghubungkan domain Cloudflare Anda ke server yang di-deploy di Railway, atau menggunakan <b>Cloudflare Tunnel (cloudflared)</b> untuk memancarkan port lokal secara langsung di balik perisai firewall Cloudflare.
+                      </p>
+
+                      <div className="space-y-2 mb-6 text-xs text-slate-300 leading-relaxed">
+                        <div className="flex items-start gap-2.5 bg-slate-950/40 p-3 rounded-xl border border-white/5">
+                          <span className="text-amber-500 font-black mt-0.5 font-mono">1.</span>
+                          <span>Tambahkan Domain Anda di panel DNS Cloudflare secara instan untuk mempercepat akses melalui Edge Network canggih.</span>
+                        </div>
+                        <div className="flex items-start gap-2.5 bg-slate-950/40 p-3 rounded-xl border border-white/5">
+                          <span className="text-amber-500 font-black mt-0.5 font-mono">2.</span>
+                          <span>Proxy Status diaktifkan (<b className="text-amber-400 font-mono">Oranye Cloud ✓</b>) untuk melindungi IP asli server backend / VPS Anda dari ancaman keamanan.</span>
+                        </div>
+                      </div>
+
+                      <div className="bg-slate-950/50 p-4 rounded-2xl border border-white/5">
+                        <span className="text-[10px] font-bold text-amber-400 block mb-2 font-mono uppercase">Setup Tunnel (Alternatif Aman VPS):</span>
+                        <div className="font-mono text-[11px] text-slate-300 space-y-1 bg-black/40 p-3 rounded-xl border border-white/5 overflow-x-auto select-all">
+                          <div>cloudflared tunnel create quiziz-tunnel</div>
+                          <div>cloudflared tunnel route dns quiziz-tunnel subdomain.ke.anda</div>
+                          <div>cloudflared tunnel run --url http://localhost:3000</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-6 pt-5 border-t border-white/5 flex items-center justify-between">
+                      <span className="text-[10px] text-gray-400">Proxy DNS &amp; SSL: <b className="text-emerald-400 font-mono">✓ Didukung Penuh</b></span>
+                      <a
+                        href="https://developers.cloudflare.com/pages/framework-guides/deploy-a-vite-site/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white text-xs font-semibold flex items-center gap-1 cursor-pointer"
+                      >
+                        Panduan Pages
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* Status Container */}
+                <div className="bg-slate-900/40 p-6 rounded-3xl border border-white/5">
+                  <h4 className="text-sm font-bold text-white mb-3 flex items-center gap-1.5">
+                    <Server className="w-4 h-4 text-emerald-400 animate-pulse" />
+                    Status Live Deployment Instan (Google Cloud Run Sandbox)
+                  </h4>
+                  <p className="text-xs text-gray-400 mb-4">
+                    Setiap perubahan kode yang Anda minta dari AI Assistant langsung dipicu dan di-deploy ke endpoint Sandbox internal kami di cluster Google Cloud Run berikut:
+                  </p>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <a
+                      href="https://ais-dev-yylqdcj5cake64hkb3f7fv-537771062967.asia-east1.run.app"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-4 rounded-2xl bg-slate-950/60 hover:bg-slate-950/90 border border-white/5 flex items-center justify-between hover:border-violet-500/20 transition-all cursor-pointer group"
+                    >
+                      <div>
+                        <span className="text-[10px] font-mono uppercase text-violet-400 font-black">Development URL</span>
+                        <div className="text-xs text-white font-mono mt-1 font-bold group-hover:text-violet-400 transition-colors truncate max-w-sm md:max-w-md animate-pulse">
+                          ais-dev-yylqdcj5cake64hkb3f7fv-537771062967.asia-east1.run.app
+                        </div>
+                      </div>
+                      <ExternalLink className="w-4 h-4 text-violet-400 group-hover:translate-x-0.5 transition-transform" />
+                    </a>
+                    
+                    <a
+                      href="https://ais-pre-yylqdcj5cake64hkb3f7fv-537771062967.asia-east1.run.app"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-4 rounded-2xl bg-slate-950/60 hover:bg-slate-950/90 border border-white/5 flex items-center justify-between hover:border-emerald-500/20 transition-all cursor-pointer group"
+                    >
+                      <div>
+                        <span className="text-[10px] font-mono uppercase text-emerald-400 font-black">Shared App URL</span>
+                        <div className="text-xs text-white font-mono mt-1 font-bold group-hover:text-emerald-400 transition-colors truncate max-w-sm md:max-w-md animate-pulse">
+                          ais-pre-yylqdcj5cake64hkb3f7fv-537771062967.asia-east1.run.app
+                        </div>
+                      </div>
+                      <ExternalLink className="w-4 h-4 text-emerald-400 group-hover:translate-x-0.5 transition-transform" />
+                    </a>
+                  </div>
+                </div>
+              </motion.div>
             )}
+            </AnimatePresence>
 
           </main>
         </div>
